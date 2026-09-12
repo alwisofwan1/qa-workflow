@@ -1,0 +1,12 @@
+{
+  "name": "qa-workflow",
+  "version": "0.1.0",
+  "description": "Agentic E2E QA pipeline with guards against self-certifying agents",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "report": "node tools/report.mjs",
+    "heal-guard": "node tools/heal-guard.mjs"
+  },
+  "engines": { "node": ">=18" }
+}
