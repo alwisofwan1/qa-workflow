@@ -1,55 +1,54 @@
 ---
 name: qa-heal
-description: Stage 5 — repair failing tests within a locked scope. Selectors and waits only; asserted values are off limits.
+description: Stage 5 — run the Playwright healer, then adjudicate its output with heal-guard. Rejected edits become findings.
 ---
 
 # qa-heal
 
-Input: failing `results.json` + the spec files.
-Output: repaired specs **or** findings. Never both for the same failure.
+The official `playwright-test-healer` is useful and will be used. It also cannot be
+trusted unsupervised, and this is not a suspicion — it is what its own agent definition
+instructs it to do:
 
-## The only thing that matters here
+> "Code Remediation: … Fixing assertions and **expected values**"
+> "You will continue this process **until the test runs successfully** without any failures or errors."
+> "If the error persists … mark this test as **test.fixme()** so that it is skipped."
+> "Do not ask user questions … do the most reasonable thing possible to **pass the test**."
+
+An agent told to make tests pass, given permission to edit expected values, will
+eventually edit an expected value. This stage exists to catch that moment.
+
+## Procedure
+
+1. **Commit the generated specs first.** That commit is the baseline. Without it the
+   guard has nothing to compare against and will pass everything.
+2. Run the healer.
+3. Adjudicate:
+
+```bash
+node tools/heal-guard.mjs --base "$BASELINE" $(git diff --name-only "$BASELINE" -- '*.spec.ts')
+```
+
+4. **Exit 0** — the healing was locator/wait work. Keep it.
+5. **Non-zero** — revert those files and convert each rejected edit into a finding.
+   Do not re-run the healer on the same failure with different wording. The guard's
+   verdict is not a puzzle to route around.
+
+## The distinction that matters
 
 A test fails for one of two reasons:
 
 - **the test is wrong** — bad locator, bad wait, bad setup → *heal it*
 - **the app is wrong, or the spec is wrong** — the asserted value does not match reality
-  → *this is a finding; escalate it, do not edit it*
+  → *finding; escalate, do not edit*
 
-Collapsing these two into "make it green" is how an agentic QA pipeline produces a
-100%-passing suite that tests nothing. Assume the second case until the first is proven.
-
-## Permitted edits
-
-- swap a locator for another **from the selector inventory**
-- replace a manual wait with a web-first assertion
-- fix setup/teardown, fixture wiring, test data
-- add assertions
-
-## Forbidden edits
-
-- changing any value inside a matcher (`toHaveText`, `toContainText`, `toHaveCount`, …)
-- deleting a test or an assertion
-- `test.skip`, `test.only`, `test.fixme`
-- loosening a strict matcher to a permissive one (`toHaveText` → `toContainText`)
-
-## Enforcement
-
-This is not enforced by your good intentions. Before handing off, run:
-
-```bash
-node tools/heal-guard.mjs --base HEAD <changed spec files>
-```
-
-A non-zero exit means the healing is rejected. Revert and file the finding instead.
-Retrying with a different phrasing of the same edit is not a fix.
+Assume the second until the first is proven.
 
 ## Findings format
 
 ```md
 ### Finding: <one line>
 - Test: `file.spec.ts:LINE` — <test title> (@ACn)
-- Expected: <what the spec/plan says>
+- Expected: <what the plan says>
 - Actual: <what the app did>
 - Assessment: app defect | spec defect | environment
 - Evidence: trace / screenshot path

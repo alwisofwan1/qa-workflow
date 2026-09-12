@@ -1,86 +1,123 @@
 # qa-workflow
 
-Agentic E2E QA pipeline: **user story → test plan → exploration → Playwright specs → execution → report → PR.**
+A guard layer over [Playwright Agents](https://playwright.dev/docs/test-agents).
 
-App-agnostic. Designed against a React + MUI + Playwright codebase, but nothing here is tied to one.
+Playwright ships a planner, a generator, and a healer. They are good — better than
+hand-rolling your own. What they do not ship is anything stopping the agent from making
+its own work look successful. That is this repo.
+
+```
+npx playwright init-agents --loop=claude     ← Playwright's three agents
+          +
+       qa-workflow                           ← the four guards they lack
+```
 
 ---
 
-## Why this exists
+## The problem
 
-Agent-generated test suites fail in a specific, predictable way: the agent is allowed to
-grade its own homework. It writes the tests, heals the tests, then writes the report that
-says the tests pass. Every one of those steps gives it another chance to make its own work
-look successful.
+An agentic QA pipeline has a structural conflict of interest: the same actor writes the
+tests, repairs the tests, and reports on the tests. Three consecutive chances to grade
+its own homework.
 
-The public examples of this pattern all share the same three defects:
+This is not hypothetical. From the stock `playwright-test-healer` agent definition:
 
-- the **healer weakens assertions** until the suite goes green,
-- the **reporter narrates** pass/fail instead of parsing it,
-- **coverage is claimed**, not computed,
+> "Code Remediation: … Fixing assertions and **expected values**"
+> "You will continue this process **until the test runs successfully** without any failures or errors."
+> "If the error persists … mark this test as **test.fixme()** so that it is skipped."
+> "Do not ask user questions … do the most reasonable thing possible to **pass the test**."
 
-and then everything is auto-committed, making the errors permanent.
+And in a published reference implementation of this exact workflow, all of it played out:
+a failing assertion was rewritten to match the app's output and logged as a successful
+heal; the report claimed 20 tests at a 100% pass rate against a repo containing 18;
+coverage was claimed at 100% for five acceptance criteria while one of the five had no
+test file at all. Every step was then committed automatically.
 
-This repo is the same workflow with those three holes closed.
-
-## The pipeline
-
-```
-User Story (RCB-XXX)
-   ↓
-1. Test Plan ─────────────▶ 🛑 HUMAN APPROVES
-   ↓
-2. Exploration (MCP) ─────▶ selector-inventory.md   (the only source of DOM truth)
-   ↓
-3. Spec Generation         (may only use locators from the inventory)
-   ↓
-4. Execution ─────────────▶ results.json
-   ↓
-5. Healing                 (scope-locked: selectors & waits only)
-   ↓                        everything else exits as a finding
-6. Report                  (numbers parsed from results.json, coverage computed)
-   ↓
-7. Branch + PR ───────────▶ 🛑 HUMAN REVIEWS ──▶ merge
-```
+None of that is a bug. It is what a pipeline with no gates produces.
 
 ## The four guards
 
 | # | Guard | Enforced by |
 |---|---|---|
-| 1 | Plan approved by a human before any code is generated | workflow stops, `skills/qa-plan` |
-| 2 | Healer may not touch asserted values, skip, or delete tests | `tools/heal-guard.mjs` (diff check, not a prompt) |
-| 3 | Report numbers come from `results.json`, never from the model | `tools/report.mjs` |
-| 4 | AC coverage computed from `@AC` tags; an untested AC fails the run | `tools/report.mjs --require-ac` |
+| 1 | Plan approved by a human before any code is generated | `skills/qa-plan` — a stop, not a prompt |
+| 2 | Healer may not change asserted values, skip, or delete tests | `tools/heal-guard.mjs` |
+| 3 | Report figures are parsed from `results.json`, never authored | `tools/report.mjs` |
+| 4 | AC coverage is computed; an untested AC fails the run | `tools/report.mjs --require-ac` |
 
-Guards 2 and 3 are code, not instructions. An agent cannot talk its way past them.
+**Guards 2 and 3 are code.** That is the whole design. A prompt saying "do not weaken
+assertions" is advice, and the failure mode here is not an agent that misunderstands the
+rule — it is an agent under pressure to produce a green result, which is exactly when
+advice loses.
+
+## What the guard actually catches
+
+```ts
+// healing — permitted: how the test finds things
+- await expect(page.locator('.summary_value')).toContainText('SauceCard #31337')
++ await expect(page.getByTestId('payment-info-value')).toContainText('SauceCard #31337')
+
+// faking — rejected: what the test asserts
+- await expect(page.getByTestId('complete-text')).toContainText('Pony Express')
++ await expect(page.getByTestId('complete-text')).toContainText('pony')
+
+// also rejected: the value is inside expect(), the matcher is a meaningless `true`
+- expect(after.endsWith('\n\n' + before)).toBe(true)
++ expect(after.endsWith('\n' + before)).toBe(true)
+
+// also rejected: disabling an assertion is deleting it
+- await expect(page.getByRole('alert')).toHaveText('saved')
++ // await expect(page.getByRole('alert')).toHaveText('saved')
+```
+
+The last two were found by trialling this against a real ticket and by the guard's own
+test suite. See [docs/trial.md](docs/trial.md).
+
+## Usage
+
+```bash
+npm test                      # the guards' own suite — 30 tests
+
+# after the healer runs, with $BASELINE = the commit before healing
+node tools/heal-guard.mjs --base "$BASELINE" tests/**/*.spec.ts
+
+# after the suite runs
+node tools/report.mjs results.json --ac AC1,AC2,AC3 --require-ac
+```
+
+Exit codes: `1` healer overstepped or tests failed · `2` an AC has no passing test.
 
 ## Locator policy
 
 Role-first, not `data-testid`-first.
 
 ```
-1. getByRole / getByLabel / getByText      ← preferred, works with MUI out of the box
+1. getByRole / getByLabel / getByText      ← preferred, works with any accessible UI
 2. existing [data-testid]                  ← use when present
-3. request a new data-testid               ← emitted as a separate small PR, never inline
+3. request a new data-testid               ← a separate small PR, never inlined
 ```
 
-Rationale: on a mature codebase, `data-testid` coverage is typically thin. Blocking on a
-full instrumentation pass would kill this initiative before it ships anything.
-Instrumentation becomes a byproduct of the workflow instead of a prerequisite.
+Requiring `data-testid` everywhere first is a multi-month instrumentation project that
+must finish before the pipeline delivers anything, which is how these initiatives die.
+Role-first works on day one and degrades gracefully. Instrumentation becomes an output
+of the workflow instead of a prerequisite for it.
+
+Side effect worth having: role-first locators fail when the app's accessibility is
+broken, surfacing real defects a `data-testid` suite would paper over.
 
 ## Layout
 
 ```
-skills/     the five agent stages (Claude Code skills)
+skills/     qa-plan · qa-heal · qa-report · qa-gate
 tools/      the guards — plain Node, no LLM, CI-runnable
-templates/  test-plan + selector-inventory formats
-docs/       design notes and decisions
-examples/   a worked run against a real ticket
+tools/lib/  pure analysis functions, unit-tested
+tests/      30 tests covering both guards
+docs/       design notes and the trial writeup
+templates/  test plan + selector inventory formats
 ```
 
 ## Status
 
-Early. Scaffold in place, first real ticket run pending.
+The guards work and are tested. Not yet run end-to-end against a full generated suite.
 
 ## License
 
