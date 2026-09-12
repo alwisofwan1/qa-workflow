@@ -50,7 +50,8 @@ const specs = (report.suites ?? []).flatMap((s) => collectSpecs(s))
 const tally = { passed: 0, failed: 0, flaky: 0, skipped: 0 }
 const failures = []
 const acSeen = new Map()
-const AC_TAG = /@(AC\d+)/g
+// Tags may be plain (@AC3) or scoped to a sub-part of a ticket (@AC-P2-3).
+const AC_TAG = /@(AC[A-Za-z0-9]*(?:-[A-Za-z0-9]+)*)/g
 
 for (const spec of specs) {
   // A spec's status lives on its test runs, not on the spec itself.

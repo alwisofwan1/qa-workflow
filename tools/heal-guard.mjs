@@ -47,6 +47,54 @@ function fingerprints(src) {
   return out
 }
 
+/**
+ * Values can also be load-bearing INSIDE expect(...), not just in the matcher:
+ *   expect(after.endsWith('\n\n' + before)).toBe(true)
+ * Here the matcher argument is a useless `true`; the real acceptance criterion is the
+ * '\n\n'. Weakening it to '\n' guts the test while leaving the matcher untouched.
+ *
+ * But expect(page.getByRole('button', { name: 'Save' })) also holds a literal, and
+ * swapping that locator is exactly what healing is FOR. So: literals inside an
+ * expect() argument are protected unless the argument is a locator expression.
+ */
+const LOCATOR_EXPR = /\b(?:page|frame)\b|\.locator\(|\bgetBy[A-Z]|\bframeLocator\(/
+const LITERAL = /(['"`])(?:\\.|(?!\1)[^\\])*\1|\/(?:\\.|[^/\\\n])+\/[gimsuy]*|\b\d+(?:\.\d+)?\b/g
+
+/** Extract the balanced argument text of every `expect(...)` call. */
+function expectArgs(src) {
+  const out = []
+  const re = /\bexpect\s*\(/g
+  let m
+  while ((m = re.exec(src)) !== null) {
+    let depth = 1
+    let i = m.index + m[0].length
+    const start = i
+    while (i < src.length && depth > 0) {
+      const ch = src[i]
+      if (ch === '(') depth += 1
+      else if (ch === ')') depth -= 1
+      else if (ch === '"' || ch === "'" || ch === '`') {
+        const quote = ch
+        i += 1
+        while (i < src.length && src[i] !== quote) i += src[i] === '\\' ? 2 : 1
+      }
+      i += 1
+    }
+    out.push(src.slice(start, i - 1))
+  }
+  return out
+}
+
+/** Literals that sit in a non-locator expect() argument — i.e. asserted data. */
+function assertedLiterals(src) {
+  const out = []
+  for (const arg of expectArgs(src)) {
+    if (LOCATOR_EXPR.test(arg)) continue // a locator: healable
+    for (const [lit] of arg.matchAll(LITERAL)) out.push(lit.replace(/\s+/g, ' '))
+  }
+  return out
+}
+
 const countOf = (src, re) => (src.match(re) ?? []).length
 
 function gitShow(ref, path) {
@@ -80,6 +128,16 @@ for (const path of files) {
     const at = pool.indexOf(fp)
     if (at === -1) problems.push(`assertion changed or removed: ${fp}`)
     else pool.splice(at, 1)
+  }
+
+  // 1b. literals asserted inside expect(...) — the AC values that live outside the matcher
+  const beforeLit = assertedLiterals(before)
+  const afterLit = assertedLiterals(after)
+  const litPool = [...afterLit]
+  for (const lit of beforeLit) {
+    const at = litPool.indexOf(lit)
+    if (at === -1) problems.push(`asserted value changed or removed inside expect(): ${lit}`)
+    else litPool.splice(at, 1)
   }
 
   // 2. assertion count must not shrink
