@@ -220,5 +220,7 @@ export function analyze(rawBefore: string, rawAfter: string): string[] {
     problems.push(`test count dropped ${beforeTests} -> ${afterTests}`)
   }
 
-  return problems
+  // One constant referenced from several positions yields the same violation repeatedly.
+  // Report each distinct problem once — a doubled line reads like two separate defects.
+  return [...new Set(problems)]
 }

@@ -189,3 +189,10 @@ test('a declaration with no initialiser does not steal the next constant', () =>
   const after = src.replace("'real value'", "'whatever the app emits'")
   flags(src, after, /named constant/, 'declare-const shadowing')
 })
+
+test('one constant referenced from several positions reports a single violation', () => {
+  const before = `const X = 'a'\ntest('t @AC1', async () => {\n  expect(v.slice(0, X.length)).toBe(X)\n})\n`
+  const after = before.replace("'a'", "'b'")
+  const problems = analyze(before, after)
+  assert.equal(problems.length, 1, `expected one problem, got ${JSON.stringify(problems)}`)
+})
