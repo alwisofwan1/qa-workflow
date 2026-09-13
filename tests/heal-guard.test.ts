@@ -196,3 +196,30 @@ test('one constant referenced from several positions reports a single violation'
   const problems = analyze(before, after)
   assert.equal(problems.length, 1, `expected one problem, got ${JSON.stringify(problems)}`)
 })
+
+test('raising a matcher timeout is permitted — the asserted value is unchanged', () => {
+  // Caught in round 3: the healer bumped two waits from 30s to 60s alongside its one
+  // real violation, and the guard reported all three. Wait adjustment is healing.
+  clean(
+    wrap(`  await expect(page.getByRole('row')).toHaveCount(1, { timeout: 30_000 })`),
+    wrap(`  await expect(page.getByRole('row')).toHaveCount(1, { timeout: 60_000 })`),
+    'timeout bump'
+  )
+})
+
+test('changing the asserted value is still rejected when options are present', () => {
+  flags(
+    wrap(`  await expect(page.getByRole('row')).toHaveCount(1, { timeout: 30_000 })`),
+    wrap(`  await expect(page.getByRole('row')).toHaveCount(0, { timeout: 30_000 })`),
+    /assertion changed or removed/,
+    'count changed with options'
+  )
+})
+
+test('an options-only matcher argument is ignored', () => {
+  clean(
+    wrap(`  await expect(page.getByRole('alert')).toBeVisible({ timeout: 5_000 })`),
+    wrap(`  await expect(page.getByRole('alert')).toBeVisible({ timeout: 15_000 })`),
+    'options-only'
+  )
+})

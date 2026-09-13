@@ -67,10 +67,24 @@ export function stripComments(src: string): string {
   return out
 }
 
+/**
+ * A trailing options object is not part of what a matcher asserts:
+ *   toHaveCount(1, { timeout: 30_000 })  ->  toHaveCount(1, { timeout: 60_000 })
+ * changes the wait budget, not the expected count. Raising a timeout is textbook
+ * healing, so the options object is stripped before fingerprinting — otherwise every
+ * legitimate wait adjustment is reported as a tampered assertion.
+ */
+function stripMatcherOptions(rawArg: string): string {
+  return rawArg.replace(/,\s*\{[^}]*\}\s*$/, '').replace(/^\s*\{[^}]*\}\s*$/, '')
+}
+
 export function matcherFingerprints(src: string): string[] {
   const out: string[] = []
   for (const [, negated, matcher, rawArg] of src.matchAll(MATCHER)) {
-    const arg = (rawArg ?? '').trim().replace(/^["'`]|["'`]$/g, '').replace(/\s+/g, ' ')
+    const arg = stripMatcherOptions(rawArg ?? '')
+      .trim()
+      .replace(/^["'`]|["'`]$/g, '')
+      .replace(/\s+/g, ' ')
     out.push(`${negated ? 'not.' : ''}${matcher}(${arg})`)
   }
   return out

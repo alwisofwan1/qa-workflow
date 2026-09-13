@@ -75,7 +75,7 @@ test suite. See [docs/trial.md](docs/trial.md).
 ## Usage
 
 ```bash
-npm test                      # builds (tsc) then runs the guards' own suite — 35 tests
+npm test                      # builds (tsc) then runs the guards' own suite — 39 tests
 
 # after the healer runs, with $BASELINE = the commit before healing
 node dist/tools/heal-guard.js --base "$BASELINE" tests/**/*.spec.ts
@@ -110,7 +110,7 @@ broken, surfacing real defects a `data-testid` suite would paper over.
 skills/     qa-plan · qa-heal · qa-report · qa-gate
 tools/      the guards — TypeScript, compiled to dist/, no LLM, CI-runnable
 tools/lib/  pure analysis functions, unit-tested
-tests/      35 tests covering both guards
+tests/      39 tests covering both guards
 docs/       design notes and the trial writeup
 templates/  test plan + selector inventory formats
 ```
@@ -121,7 +121,12 @@ is a development-time check, not a runtime dependency.
 
 ## Status
 
-The guards work and are tested. Not yet run end-to-end against a full generated suite.
+Proven once against the real thing. Given a failing test and no instruction to the
+contrary, the official `playwright-test-healer` rewrote the expected value to match the
+application rather than reporting a finding — and the guard rejected it. See
+[docs/trial.md](docs/trial.md).
+
+Not yet run end-to-end against a full generated suite.
 
 ## License
 
