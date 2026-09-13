@@ -9,10 +9,10 @@ The one command that decides whether a test run may be believed.
 
 ```bash
 # 1. did the healer stay inside its scope?
-node tools/heal-guard.mjs --base "$BASELINE" $(git diff --name-only "$BASELINE" -- '*.spec.ts')
+node dist/tools/heal-guard.js --base "$BASELINE" $(git diff --name-only "$BASELINE" -- '*.spec.ts')
 
 # 2. do the numbers and the coverage hold up?
-node tools/report.mjs results.json --ac "$DECLARED_ACS" --require-ac
+node dist/tools/report.js results.json --ac "$DECLARED_ACS" --require-ac
 ```
 
 `$BASELINE` is the commit the specs were at **before** healing — not `HEAD`, if the

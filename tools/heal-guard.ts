@@ -7,26 +7,32 @@
  * between healing and faking, and it is not left to the agent's judgement.
  *
  * Usage:
- *   node tools/heal-guard.mjs [--base <ref>] [--json] <spec files...>
+ *   node dist/tools/heal-guard.js [--base <ref>] [--json] <spec files...>
  *
  * Exit codes: 0 clean · 1 violation · 3 bad input
  */
 import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
-import { analyze } from './lib/heal-guard-core.mjs'
+import { analyze } from './lib/heal-guard-core.js'
+
+interface Result {
+  path: string
+  problems: string[]
+  note?: string
+}
 
 const argv = process.argv.slice(2)
 const baseIdx = argv.indexOf('--base')
-const base = baseIdx === -1 ? 'HEAD' : argv[baseIdx + 1]
+const base: string | undefined = baseIdx === -1 ? 'HEAD' : argv[baseIdx + 1]
 const asJson = argv.includes('--json')
 const files = argv.filter((a, i) => !a.startsWith('--') && i !== baseIdx + 1)
 
 if (files.length === 0) {
-  console.error('usage: node tools/heal-guard.mjs [--base <ref>] [--json] <spec files...>')
+  console.error('usage: node dist/tools/heal-guard.js [--base <ref>] [--json] <spec files...>')
   process.exit(3)
 }
 
-function gitShow(ref, path) {
+function gitShow(ref: string | undefined, path: string): string | null {
   try {
     return execFileSync('git', ['show', `${ref}:${path}`], {
       encoding: 'utf8',
@@ -37,7 +43,7 @@ function gitShow(ref, path) {
   }
 }
 
-const results = []
+const results: Result[] = []
 for (const path of files) {
   if (!existsSync(path)) {
     results.push({ path, problems: ['file is gone — the healer may not delete spec files'] })

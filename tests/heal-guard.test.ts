@@ -1,11 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { analyze, assertedLiterals, expectArgs } from '../tools/lib/heal-guard-core.mjs'
+import { analyze, assertedLiterals, expectArgs } from '../tools/lib/heal-guard-core.js'
 
-const wrap = (body) => `import { test, expect } from '@playwright/test'\ntest('t @AC1', async ({ page }) => {\n${body}\n})\n`
+const wrap = (body: string): string =>
+  `import { test, expect } from '@playwright/test'\ntest('t @AC1', async ({ page }) => {\n${body}\n})\n`
 
-const clean = (before, after, msg) => assert.deepEqual(analyze(before, after), [], msg)
-const flags = (before, after, re, msg) => {
+const clean = (before: string, after: string, msg?: string) => assert.deepEqual(analyze(before, after), [], msg)
+const flags = (before: string, after: string, re: RegExp, msg: string) => {
   const problems = analyze(before, after)
   assert.ok(problems.length > 0, `${msg}: expected a violation, got none`)
   assert.ok(problems.some((p) => re.test(p)), `${msg}: got ${JSON.stringify(problems)}`)

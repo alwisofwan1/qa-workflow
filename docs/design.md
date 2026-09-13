@@ -20,11 +20,11 @@ None of these are bugs. They are the natural output of a pipeline with no gates.
 ## Design response
 
 **Guards must be code, not instructions.** A prompt that says "do not weaken assertions"
-is advice. `tools/heal-guard.mjs` is a constraint. The distinction matters because the
+is advice. `tools/heal-guard.ts` is a constraint. The distinction matters because the
 failure mode is not an agent that misunderstands the rule — it is an agent under pressure
 to produce a green result, which is exactly the condition under which advice loses.
 
-**The reporter must not be able to author its own numbers.** `tools/report.mjs` reads the
+**The reporter must not be able to author its own numbers.** `tools/report.ts` reads the
 Playwright JSON reporter output and emits the metrics table and AC coverage table. The
 model contributes prose. It has no path to a figure.
 

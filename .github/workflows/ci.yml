@@ -13,6 +13,8 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
+          cache: npm
+      - run: npm ci
       # The guards are the product. If their own tests do not pass, nothing downstream
       # can be trusted — a guard that is quietly broken is worse than no guard, because
       # the pipeline still reports green.
