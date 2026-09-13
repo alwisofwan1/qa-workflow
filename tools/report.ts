@@ -7,7 +7,7 @@
  * output; it may not produce the output.
  *
  * Usage:
- *   node tools/report.mjs <results.json> [--ac AC1,AC2] [--require-ac] [--json] [--out FILE]
+ *   node dist/tools/report.js <results.json> [--ac AC1,AC2] [--require-ac] [--json] [--out FILE]
  *
  * Exit codes:
  *   0  all tests passed (and every declared AC covered, with --require-ac)
@@ -16,15 +16,15 @@
  *   3  bad input
  */
 import { readFileSync, writeFileSync } from 'node:fs'
-import { summarize, renderMarkdown } from './lib/report-core.mjs'
+import { summarize, renderMarkdown, type PwReport } from './lib/report-core.js'
 
 const argv = process.argv.slice(2)
-const flag = (n) => argv.includes(`--${n}`)
-const opt = (n) => {
+const flag = (n: string): boolean => argv.includes(`--${n}`)
+const opt = (n: string): string | null => {
   const i = argv.indexOf(`--${n}`)
-  return i === -1 ? null : argv[i + 1]
+  return i === -1 ? null : (argv[i + 1] ?? null)
 }
-const consumed = new Set()
+const consumed = new Set<number>()
 for (const n of ['ac', 'out']) {
   const i = argv.indexOf(`--${n}`)
   if (i !== -1) consumed.add(i + 1)
@@ -32,15 +32,15 @@ for (const n of ['ac', 'out']) {
 const file = argv.find((a, i) => !a.startsWith('--') && !consumed.has(i))
 
 if (!file) {
-  console.error('usage: node tools/report.mjs <results.json> [--ac AC1,AC2] [--require-ac] [--json] [--out FILE]')
+  console.error('usage: node dist/tools/report.js <results.json> [--ac AC1,AC2] [--require-ac] [--json] [--out FILE]')
   process.exit(3)
 }
 
-let report
+let report: PwReport
 try {
   report = JSON.parse(readFileSync(file, 'utf8'))
 } catch (err) {
-  console.error(`cannot read ${file}: ${err.message}`)
+  console.error(`cannot read ${file}: ${err instanceof Error ? err.message : String(err)}`)
   process.exit(3)
 }
 

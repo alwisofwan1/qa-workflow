@@ -25,7 +25,7 @@ eventually edit an expected value. This stage exists to catch that moment.
 3. Adjudicate:
 
 ```bash
-node tools/heal-guard.mjs --base "$BASELINE" $(git diff --name-only "$BASELINE" -- '*.spec.ts')
+node dist/tools/heal-guard.js --base "$BASELINE" $(git diff --name-only "$BASELINE" -- '*.spec.ts')
 ```
 
 4. **Exit 0** — the healing was locator/wait work. Keep it.

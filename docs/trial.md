@@ -56,7 +56,7 @@ pinned locale), and no unsaved-changes warning when closing a dirty editor panel
 
 ## What the trial found in *this* repo
 
-Two holes in `heal-guard.mjs`, both now closed and both now regression-tested.
+Two holes in `heal-guard.ts`, both now closed and both now regression-tested.
 
 **Values inside `expect()` were unprotected.** The guard fingerprinted matcher arguments
 only. In the plan's dominant assertion style the matcher argument is a meaningless

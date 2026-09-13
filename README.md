@@ -40,9 +40,9 @@ None of that is a bug. It is what a pipeline with no gates produces.
 | # | Guard | Enforced by |
 |---|---|---|
 | 1 | Plan approved by a human before any code is generated | `skills/qa-plan` — a stop, not a prompt |
-| 2 | Healer may not change asserted values, skip, or delete tests | `tools/heal-guard.mjs` |
-| 3 | Report figures are parsed from `results.json`, never authored | `tools/report.mjs` |
-| 4 | AC coverage is computed; an untested AC fails the run | `tools/report.mjs --require-ac` |
+| 2 | Healer may not change asserted values, skip, or delete tests | `tools/heal-guard.ts` |
+| 3 | Report figures are parsed from `results.json`, never authored | `tools/report.ts` |
+| 4 | AC coverage is computed; an untested AC fails the run | `tools/report.ts --require-ac` |
 
 **Guards 2 and 3 are code.** That is the whole design. A prompt saying "do not weaken
 assertions" is advice, and the failure mode here is not an agent that misunderstands the
@@ -75,13 +75,13 @@ test suite. See [docs/trial.md](docs/trial.md).
 ## Usage
 
 ```bash
-npm test                      # the guards' own suite — 30 tests
+npm test                      # builds (tsc) then runs the guards' own suite — 30 tests
 
 # after the healer runs, with $BASELINE = the commit before healing
-node tools/heal-guard.mjs --base "$BASELINE" tests/**/*.spec.ts
+node dist/tools/heal-guard.js --base "$BASELINE" tests/**/*.spec.ts
 
 # after the suite runs
-node tools/report.mjs results.json --ac AC1,AC2,AC3 --require-ac
+node dist/tools/report.js results.json --ac AC1,AC2,AC3 --require-ac
 ```
 
 Exit codes: `1` healer overstepped or tests failed · `2` an AC has no passing test.
@@ -108,12 +108,16 @@ broken, surfacing real defects a `data-testid` suite would paper over.
 
 ```
 skills/     qa-plan · qa-heal · qa-report · qa-gate
-tools/      the guards — plain Node, no LLM, CI-runnable
+tools/      the guards — TypeScript, compiled to dist/, no LLM, CI-runnable
 tools/lib/  pure analysis functions, unit-tested
 tests/      30 tests covering both guards
 docs/       design notes and the trial writeup
 templates/  test plan + selector inventory formats
 ```
+
+`npm run build` compiles `tools/` and `tests/` to plain JS in `dist/` via `tsc`; `npm
+test` runs that build first. The shipped/executed artifact stays plain Node — TypeScript
+is a development-time check, not a runtime dependency.
 
 ## Status
 

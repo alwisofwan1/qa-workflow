@@ -32,7 +32,7 @@ const TESTS = /^\s*test(?:\.\w+)*\s*\(/gm
  *
  * String and template literals are preserved — a URL containing `//` is not a comment.
  */
-export function stripComments(src) {
+export function stripComments(src: string): string {
   let out = ''
   let i = 0
   while (i < src.length) {
@@ -67,20 +67,20 @@ export function stripComments(src) {
   return out
 }
 
-export function matcherFingerprints(src) {
-  const out = []
+export function matcherFingerprints(src: string): string[] {
+  const out: string[] = []
   for (const [, negated, matcher, rawArg] of src.matchAll(MATCHER)) {
-    const arg = rawArg.trim().replace(/^["'`]|["'`]$/g, '').replace(/\s+/g, ' ')
+    const arg = (rawArg ?? '').trim().replace(/^["'`]|["'`]$/g, '').replace(/\s+/g, ' ')
     out.push(`${negated ? 'not.' : ''}${matcher}(${arg})`)
   }
   return out
 }
 
 /** Balanced-paren extraction of every `expect(...)` / `expect.soft(...)` argument. */
-export function expectArgs(src) {
-  const out = []
+export function expectArgs(src: string): string[] {
+  const out: string[] = []
   const re = new RegExp(EXPECTS.source, 'g')
-  let m
+  let m: RegExpExecArray | null
   while ((m = re.exec(src)) !== null) {
     let depth = 1
     let i = m.index + m[0].length
@@ -102,8 +102,8 @@ export function expectArgs(src) {
 }
 
 /** Literals sitting in a non-locator expect() argument — i.e. asserted data. */
-export function assertedLiterals(src) {
-  const out = []
+export function assertedLiterals(src: string): string[] {
+  const out: string[] = []
   for (const arg of expectArgs(src)) {
     if (LOCATOR_EXPR.test(arg)) continue
     for (const [lit] of arg.matchAll(new RegExp(LITERAL.source, 'g'))) {
@@ -113,12 +113,12 @@ export function assertedLiterals(src) {
   return out
 }
 
-const countOf = (src, re) => (src.match(new RegExp(re.source, re.flags)) ?? []).length
+const countOf = (src: string, re: RegExp): number => (src.match(new RegExp(re.source, re.flags)) ?? []).length
 
 /** Multiset difference: entries present in `before` that `after` no longer covers. */
-function missing(beforeList, afterList) {
+function missing(beforeList: string[], afterList: string[]): string[] {
   const pool = [...afterList]
-  const gone = []
+  const gone: string[] = []
   for (const item of beforeList) {
     const at = pool.indexOf(item)
     if (at === -1) gone.push(item)
@@ -127,12 +127,9 @@ function missing(beforeList, afterList) {
   return gone
 }
 
-/**
- * Compare two versions of a spec file.
- * @returns {string[]} human-readable violations; empty means the healing stayed in scope.
- */
-export function analyze(rawBefore, rawAfter) {
-  const problems = []
+/** Compare two versions of a spec file; empty result means the healing stayed in scope. */
+export function analyze(rawBefore: string, rawAfter: string): string[] {
+  const problems: string[] = []
   const before = stripComments(rawBefore)
   const after = stripComments(rawAfter)
 

@@ -1,15 +1,25 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { summarize, specStatus, collectSpecs, acStatus, renderMarkdown } from '../tools/lib/report-core.mjs'
+import {
+  summarize,
+  specStatus,
+  collectSpecs,
+  acStatus,
+  renderMarkdown,
+  type PwSpec,
+  type PwSuite,
+} from '../tools/lib/report-core.js'
 
-const spec = (title, statuses, extra = {}) => ({
+const spec = (title: string, statuses: string[], extra: Partial<PwSpec> = {}): PwSpec => ({
   title,
   file: 'a.spec.ts',
   line: 1,
   tests: [{ results: statuses.map((status) => ({ status })) }],
   ...extra,
 })
-const report = (specs, nested = []) => ({ suites: [{ title: 's', specs, suites: nested }] })
+const report = (specs: PwSpec[], nested: PwSuite[] = []): { suites: PwSuite[] } => ({
+  suites: [{ specs, suites: nested }],
+})
 
 test('an empty report yields zeros, not a crash', () => {
   const s = summarize({}, [])

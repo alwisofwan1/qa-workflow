@@ -19,7 +19,7 @@ A plan from `playwright-test-planner` plus the ticket's acceptance criteria.
    under `## Untestable` with a reason. An AC that is simply absent is the single most
    common way an agentic QA run reports success while proving nothing.
 2. **Every scenario carries its AC tag** (`@AC1`, `@AC-P2-3`) in the title that will
-   become the test title. `tools/report.mjs` computes coverage from these; an untagged
+   become the test title. `tools/report.ts` computes coverage from these; an untagged
    test is invisible to the gate.
 3. **File paths point where the test runner actually looks.** Planners have been
    observed writing spec paths into the plans directory, which produces files Playwright
