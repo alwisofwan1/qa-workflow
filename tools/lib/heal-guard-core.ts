@@ -113,6 +113,67 @@ export function assertedLiterals(src: string): string[] {
   return out
 }
 
+/**
+ * Expected values are usually hoisted into named constants — the planner recommends it,
+ * and it reads better:
+ *
+ *   const GENERAL_MEETING_OPENING = '会議の書き起こしから、…'
+ *   expect(prefix.startsWith(GENERAL_MEETING_OPENING)).toBe(true)
+ *
+ * Fingerprinting only the literals that appear inline in an assertion misses this
+ * completely: editing the constant guts the test while every assertion line stays
+ * byte-identical. So resolve identifiers referenced from a protected position back to
+ * their declared literal and protect that instead.
+ *
+ * A constant only used to build a locator is NOT protected, because expect() arguments
+ * that are locator expressions are skipped before this runs — renaming a button label is
+ * healing, not faking.
+ */
+// The type-annotation group must not cross a newline. `[^=]+` spanning lines lets a
+// declaration with no initialiser (`declare const process: {...}`) swallow everything up
+// to the next `=` in the file and steal the NEXT constant's literal — which silently
+// removes that constant from protection.
+const CONST_LITERAL =
+  /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=\n]+)?=\s*((['"`])(?:\\.|(?!\3)[^\\])*\3)/g
+const IDENTIFIER = /\b([A-Za-z_$][\w$]*)\b/g
+
+/** Map of module constants that hold a plain string literal. */
+export function constantLiterals(src: string): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const m of src.matchAll(CONST_LITERAL)) {
+    const name = m[1]
+    const value = m[2]
+    if (name && value) out.set(name, value.replace(/\s+/g, ' '))
+  }
+  return out
+}
+
+/** Literal values reachable from an assertion via a named constant. */
+export function referencedConstants(src: string): string[] {
+  const constants = constantLiterals(src)
+  if (constants.size === 0) return []
+
+  const positions: string[] = []
+  for (const arg of expectArgs(src)) {
+    if (LOCATOR_EXPR.test(arg)) continue
+    positions.push(arg)
+  }
+  for (const m of src.matchAll(new RegExp(MATCHER.source, 'g'))) {
+    if (m[3]) positions.push(m[3])
+  }
+
+  const out: string[] = []
+  for (const text of positions) {
+    for (const m of text.matchAll(new RegExp(IDENTIFIER.source, 'g'))) {
+      const name = m[1]
+      if (!name) continue
+      const literal = constants.get(name)
+      if (literal !== undefined) out.push(`${name}=${literal}`)
+    }
+  }
+  return out
+}
+
 const countOf = (src: string, re: RegExp): number => (src.match(new RegExp(re.source, re.flags)) ?? []).length
 
 /** Multiset difference: entries present in `before` that `after` no longer covers. */
@@ -138,6 +199,9 @@ export function analyze(rawBefore: string, rawAfter: string): string[] {
   }
   for (const lit of missing(assertedLiterals(before), assertedLiterals(after))) {
     problems.push(`asserted value changed or removed inside expect(): ${lit}`)
+  }
+  for (const ref of missing(referencedConstants(before), referencedConstants(after))) {
+    problems.push(`expected value changed via a named constant: ${ref}`)
   }
 
   const beforeExpects = countOf(before, EXPECTS)

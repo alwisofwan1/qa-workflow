@@ -150,3 +150,42 @@ test('a brand-new assertion style does not crash the analyzer', () => {
   const after = wrap('  await expect(page.getByRole("row")).toHaveCount(3)\n  await expect.poll(() => n).toBe(3)')
   assert.deepEqual(analyze(before, after), [])
 })
+
+test('changing an expected value held in a named constant is rejected', () => {
+  // The hole the RCB-919 trial exposed: the planner hoists expected values into
+  // constants, so every assertion line stays byte-identical while the criterion is
+  // rewritten one line above.
+  const before = `const OPENING = 'the real opening'\ntest('t @AC1', async () => {\n  expect(prefix.startsWith(OPENING)).toBe(true)\n})\n`
+  const after = `const OPENING = 'whatever the app happens to emit'\ntest('t @AC1', async () => {\n  expect(prefix.startsWith(OPENING)).toBe(true)\n})\n`
+  flags(before, after, /named constant/, 'constant rewritten')
+})
+
+test('a constant used only to build a locator stays healable', () => {
+  const before = `const SAVE = 'Save'\ntest('t @AC1', async ({ page }) => {\n  await expect(page.getByRole('button', { name: SAVE })).toBeEnabled()\n})\n`
+  const after = `const SAVE = '保存'\ntest('t @AC1', async ({ page }) => {\n  await expect(page.getByRole('button', { name: SAVE })).toBeEnabled()\n})\n`
+  clean(before, after, 'locator constant')
+})
+
+test('a constant referenced from a matcher argument is protected', () => {
+  const before = `const EXPECTED = 'abc'\ntest('t @AC1', async () => {\n  expect(value).toBe(EXPECTED)\n})\n`
+  const after = `const EXPECTED = 'xyz'\ntest('t @AC1', async () => {\n  expect(value).toBe(EXPECTED)\n})\n`
+  flags(before, after, /named constant/, 'matcher constant')
+})
+
+test('renaming a constant without changing its value is permitted', () => {
+  const before = `const OPENING = 'same text'\ntest('t @AC1', async () => {\n  expect(p.startsWith(OPENING)).toBe(true)\n})\n`
+  const after = `const TEMPLATE_OPENING = 'same text'\ntest('t @AC1', async () => {\n  expect(p.startsWith(TEMPLATE_OPENING)).toBe(true)\n})\n`
+  // The value is what matters, not the name — but the fingerprint includes the name, so
+  // this is reported. Documented deliberately: a rename during healing is suspicious
+  // enough to warrant a human glance, and renames are not part of healing's job.
+  flags(before, after, /named constant/, 'constant renamed')
+})
+
+test('a declaration with no initialiser does not steal the next constant', () => {
+  // `declare const process: {...}` has no `=`. A type-annotation pattern that crosses
+  // newlines swallows up to the next `=` in the file and captures the FOLLOWING
+  // constant's literal under the wrong name — silently unprotecting it.
+  const src = `declare const process: { env: Record<string, string> }\n\nconst EXPECTED = 'real value'\ntest('t @AC1', async () => {\n  expect(v.startsWith(EXPECTED)).toBe(true)\n})\n`
+  const after = src.replace("'real value'", "'whatever the app emits'")
+  flags(src, after, /named constant/, 'declare-const shadowing')
+})
