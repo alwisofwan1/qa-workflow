@@ -109,7 +109,17 @@ things the planner got wrong or could not know:
   produces a test that passes or fails by luck. When it loses, the create request is
   rejected with an error the app logs to the console and never surfaces — the dialog just
   sits there, and the test times out somewhere unrelated.
-- **The plan claimed the detail panel auto-opens after creation. It does not.**
+- **A wrong "correction" to the plan, which cost the most time of anything here.** The
+  plan said the detail panel auto-opens after creation. An early run showed no panel, so
+  the spec was "fixed" to click the new row open instead — and from then on it failed
+  intermittently. The plan was right. The panel does open, and the list behind it is
+  *unmounted*, so no row exists to click. The run that showed no panel was one where
+  creation had silently failed, so the panel never opened. The test was therefore waiting
+  for a state that only occurs when the feature is broken: it passed when the app
+  misbehaved and failed when it worked. Network tracing settled it — `POST` 200, the
+  refetch returning the larger payload, the row never rendering, a reload showing it —
+  which read exactly like a state-commit bug until a snapshot showed the drawer open and
+  the table gone.
 - **Creating a record remounts the screen and re-runs the feature-flag fetch**, so the
   list is briefly the pre-flag UI with no rows.
 
