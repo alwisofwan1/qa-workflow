@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { analyze, assertedLiterals, expectArgs } from '../tools/lib/heal-guard-core.js'
+import { analyze, assertedLiterals, expectArgs, relativeImports } from '../tools/lib/heal-guard-core.js'
 
 const wrap = (body: string): string =>
   `import { test, expect } from '@playwright/test'\ntest('t @AC1', async ({ page }) => {\n${body}\n})\n`
@@ -222,4 +222,31 @@ test('an options-only matcher argument is ignored', () => {
     wrap(`  await expect(page.getByRole('alert')).toBeVisible({ timeout: 15_000 })`),
     'options-only'
   )
+})
+
+test('a constant imported from a fixture module is protected', () => {
+  // Verified blind spot before the fix: moving the expected value into another file
+  // defeated the guard entirely, because nothing linked the constant to the assertion.
+  const spec = `import { EXPECTED } from './fixtures/constants'\ntest('t @AC1', async () => {\n  expect(p.slice(0, EXPECTED.length)).toBe(EXPECTED)\n})\n`
+  const fixtureBefore = `export const EXPECTED = 'the real opening'\n`
+  const fixtureAfter = `export const EXPECTED = 'whatever the app emits'\n`
+  const problems = analyze(spec, spec, {
+    beforeImported: [fixtureBefore],
+    afterImported: [fixtureAfter],
+  })
+  assert.ok(
+    problems.some((p) => /named constant/.test(p)),
+    `expected a violation, got ${JSON.stringify(problems)}`
+  )
+})
+
+test('an unchanged imported fixture raises nothing', () => {
+  const spec = `import { EXPECTED } from './fixtures/constants'\ntest('t @AC1', async () => {\n  expect(v).toBe(EXPECTED)\n})\n`
+  const fixture = `export const EXPECTED = 'stable'\n`
+  assert.deepEqual(analyze(spec, spec, { beforeImported: [fixture], afterImported: [fixture] }), [])
+})
+
+test('relativeImports finds relative specifiers and ignores packages', () => {
+  const src = `import { test } from '@playwright/test'\nimport { A } from './a'\nimport { B } from '../b/c'\n`
+  assert.deepEqual(relativeImports(src), ['./a', '../b/c'])
 })

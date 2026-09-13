@@ -13,7 +13,9 @@
  */
 import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
-import { analyze } from './lib/heal-guard-core.js'
+import { dirname, relative, resolve } from 'node:path'
+
+import { analyze, relativeImports } from './lib/heal-guard-core.js'
 
 interface Result {
   path: string
@@ -30,6 +32,43 @@ const files = argv.filter((a, i) => !a.startsWith('--') && i !== baseIdx + 1)
 if (files.length === 0) {
   console.error('usage: node dist/tools/heal-guard.js [--base <ref>] [--json] <spec files...>')
   process.exit(3)
+}
+
+/** Candidate on-disk paths for a relative module specifier. */
+function candidates(fromFile: string, spec: string): string[] {
+  const base = resolve(dirname(fromFile), spec)
+  return [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`, `${base}/index.tsx`]
+}
+
+/**
+ * Resolve a spec's relative imports to source text, on both sides of the change.
+ *
+ * This is what stops an expected value being smuggled out of the spec and edited in a
+ * fixture module instead. Non-relative imports are ignored: a package's contents are not
+ * part of what the healer may edit.
+ */
+function importedSources(
+  specPath: string,
+  ref: string | undefined,
+  before: string,
+  after: string
+): { beforeImported: string[]; afterImported: string[] } {
+  const specs = new Set([...relativeImports(before), ...relativeImports(after)])
+  const beforeImported: string[] = []
+  const afterImported: string[] = []
+
+  for (const spec of specs) {
+    for (const candidate of candidates(specPath, spec)) {
+      const rel = relative(process.cwd(), candidate)
+      const past = gitShow(ref, rel)
+      const present = existsSync(candidate) ? readFileSync(candidate, 'utf8') : null
+      if (past === null && present === null) continue
+      if (past !== null) beforeImported.push(past)
+      if (present !== null) afterImported.push(present)
+      break
+    }
+  }
+  return { beforeImported, afterImported }
 }
 
 function gitShow(ref: string | undefined, path: string): string | null {
@@ -54,7 +93,8 @@ for (const path of files) {
     results.push({ path, problems: [], note: 'new file, no baseline' })
     continue
   }
-  results.push({ path, problems: analyze(before, readFileSync(path, 'utf8')) })
+  const after = readFileSync(path, 'utf8')
+  results.push({ path, problems: analyze(before, after, importedSources(path, base, before, after)) })
 }
 
 const violations = results.reduce((n, r) => n + r.problems.length, 0)

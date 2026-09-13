@@ -9,7 +9,9 @@
     "pretest": "npm run build",
     "test": "node --test dist/tests/*.test.js",
     "report": "node dist/tools/report.js",
-    "heal-guard": "node dist/tools/heal-guard.js"
+    "heal-guard": "node dist/tools/heal-guard.js",
+    "gate": "node dist/tools/qa-gate.js",
+    "prepack": "npm run build"
   },
   "engines": {
     "node": ">=18"
@@ -17,5 +19,17 @@
   "devDependencies": {
     "typescript": "^5.7.0",
     "@types/node": "^22.10.0"
-  }
+  },
+  "bin": {
+    "qa-gate": "dist/tools/qa-gate.js",
+    "qa-heal-guard": "dist/tools/heal-guard.js",
+    "qa-report": "dist/tools/report.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "templates",
+    "README.md",
+    "LICENSE"
+  ]
 }

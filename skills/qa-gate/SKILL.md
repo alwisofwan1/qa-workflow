@@ -7,17 +7,24 @@ description: Run both guards over a healed test run and return a release verdict
 
 The one command that decides whether a test run may be believed.
 
-```bash
-# 1. did the healer stay inside its scope?
-node dist/tools/heal-guard.js --base "$BASELINE" $(git diff --name-only "$BASELINE" -- '*.spec.ts')
-
-# 2. do the numbers and the coverage hold up?
-node dist/tools/report.js results.json --ac "$DECLARED_ACS" --require-ac
+```sh
+qa-gate --results results.json --ac AC1,AC2,AC3 [--base <reviewed-commit>] [--out gate.md]
 ```
 
-`$BASELINE` is the commit the specs were at **before** healing — not `HEAD`, if the
-healer has already committed. Getting this wrong makes the guard compare a file to
-itself and pass everything.
+It answers two independent questions, and either one blocks:
+
+1. **Did anything tamper with the tests since the baseline?** Only when `--base` is given.
+   Spec files are taken from `git diff --name-only <base>` unless `--specs` names them.
+2. **Do the results and the coverage hold up?** Failures, acceptance criteria with no
+   test, and criteria proven only by a flaky pass all block.
+
+A green run is still blocked if a spec was tampered with. That combination — all tests
+passing, release refused — is the whole reason this exists.
+
+`--base` is the commit the specs were last **reviewed** at, not `HEAD`. Pointing it at
+HEAD compares a file to itself and passes everything.
+
+For a release gate in CI, start from `templates/release-gate.yml`.
 
 ## Exit codes
 

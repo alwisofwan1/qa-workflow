@@ -58,17 +58,15 @@ These are properties of the approach, not bugs, and anyone relying on it should 
 handles the shapes seen in real planner- and healer-generated code, but it can be walked
 around by anyone who wants to.
 
-**It only sees one file at a time.** Verified: move the expected value into an imported
-fixture —
+**Relative imports are followed; package imports are not.** Moving an expected value into
+a fixture module used to defeat the guard completely — the spec still referenced the name,
+but the literal lived elsewhere and nothing linked the two. The guard now resolves a
+spec's relative imports on both sides of the change and protects constants declared there.
+Imports from packages are deliberately not followed: a dependency's contents are not
+something a healer may edit.
 
-```ts
-import { EXPECTED_OPENING } from './fixtures/constants'
-expect(prefix.slice(0, EXPECTED_OPENING.length)).toBe(EXPECTED_OPENING)
-```
-
-— edit the constant in that other file, and the guard passes with exit 0. Passing every
-changed file does not help: the constant's file contains no assertion, so nothing links
-the two. Closing this needs cross-file resolution, which needs a real parser.
+Resolution is still textual, so indirection it does not model — re-exports, a constant
+built by concatenation, a value read from JSON — remains out of reach.
 
 **It cannot tell who is right.** By design. When the spec and the app disagree, the guard
 refuses the edit and escalates; it does not know whether the spec has a typo or the app

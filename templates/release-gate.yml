@@ -1,0 +1,69 @@
+# Reusable release gate — drop into the APP repo as .github/workflows/release-gate.yml
+#
+# Runs the happy-path suite before a release and decides whether its green is worth
+# believing. Blocks on: any failure, any acceptance criterion without a passing test, and
+# any tampering with the specs since the baseline.
+#
+# Set DECLARED_ACS to the acceptance criteria the suite is supposed to prove. Leaving it
+# empty disables the coverage gate, which defeats half the point.
+
+name: release-gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      baseline:
+        description: 'Commit the specs were reviewed at (tamper check). Leave empty to skip.'
+        required: false
+        default: ''
+  pull_request:
+    branches: [main]
+
+env:
+  DECLARED_ACS: '' # e.g. AC1,AC2,AC3
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # the tamper check needs history
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      # `|| true` on purpose: a failing suite must reach the gate, which explains WHY it
+      # failed, rather than dying here with a bare non-zero exit.
+      - name: Run the happy-path suite
+        run: npx playwright test --reporter=json > results.json || true
+        env:
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+          E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+
+      - name: Gate
+        run: |
+          npx --yes github:alwisofwan1/qa-workflow qa-gate \
+            --results results.json \
+            --ac "$DECLARED_ACS" \
+            ${{ inputs.baseline && format('--base {0}', inputs.baseline) || '' }} \
+            --out gate.md
+
+      - name: Publish the verdict
+        if: always()
+        run: cat gate.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gate
+          path: |
+            gate.md
+            results.json
+            playwright-report/

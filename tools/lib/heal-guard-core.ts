@@ -162,9 +162,28 @@ export function constantLiterals(src: string): Map<string, string> {
   return out
 }
 
-/** Literal values reachable from an assertion via a named constant. */
-export function referencedConstants(src: string): string[] {
+/** Relative module specifiers this file imports — the only ones worth resolving. */
+export function relativeImports(src: string): string[] {
+  const out: string[] = []
+  const re = /\bfrom\s+['"](\.[^'"]*)['"]/g
+  for (const m of stripComments(src).matchAll(re)) if (m[1]) out.push(m[1])
+  return [...new Set(out)]
+}
+
+/**
+ * Literal values reachable from an assertion via a named constant.
+ *
+ * `imported` carries the source of files this spec imports. Without it, moving an
+ * expected value into a fixture module defeats the guard entirely: the spec still
+ * references the name, but the literal lives elsewhere and nothing links the two.
+ */
+export function referencedConstants(src: string, imported: string[] = []): string[] {
   const constants = constantLiterals(src)
+  for (const extra of imported) {
+    for (const [name, value] of constantLiterals(extra)) {
+      if (!constants.has(name)) constants.set(name, value)
+    }
+  }
   if (constants.size === 0) return []
 
   const positions: string[] = []
@@ -203,7 +222,17 @@ function missing(beforeList: string[], afterList: string[]): string[] {
 }
 
 /** Compare two versions of a spec file; empty result means the healing stayed in scope. */
-export function analyze(rawBefore: string, rawAfter: string): string[] {
+export interface AnalyzeOptions {
+  /** Source of the files this spec imports, before and after the change. */
+  beforeImported?: string[]
+  afterImported?: string[]
+}
+
+export function analyze(
+  rawBefore: string,
+  rawAfter: string,
+  options: AnalyzeOptions = {}
+): string[] {
   const problems: string[] = []
   const before = stripComments(rawBefore)
   const after = stripComments(rawAfter)
@@ -214,7 +243,9 @@ export function analyze(rawBefore: string, rawAfter: string): string[] {
   for (const lit of missing(assertedLiterals(before), assertedLiterals(after))) {
     problems.push(`asserted value changed or removed inside expect(): ${lit}`)
   }
-  for (const ref of missing(referencedConstants(before), referencedConstants(after))) {
+  const beforeRefs = referencedConstants(before, (options.beforeImported ?? []).map(stripComments))
+  const afterRefs = referencedConstants(after, (options.afterImported ?? []).map(stripComments))
+  for (const ref of missing(beforeRefs, afterRefs)) {
     problems.push(`expected value changed via a named constant: ${ref}`)
   }
 
