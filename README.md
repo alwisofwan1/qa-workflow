@@ -75,7 +75,7 @@ test suite. See [docs/trial.md](docs/trial.md).
 ## Usage
 
 ```bash
-npm test                      # builds (tsc) then runs the guards' own suite — 30 tests
+npm test                      # builds (tsc) then runs the guards' own suite — 35 tests
 
 # after the healer runs, with $BASELINE = the commit before healing
 node dist/tools/heal-guard.js --base "$BASELINE" tests/**/*.spec.ts
