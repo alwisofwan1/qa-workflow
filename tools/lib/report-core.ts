@@ -56,6 +56,10 @@ export interface Summary {
 // Tags may be plain (@AC3) or scoped to a part of a ticket (@AC-P2-3).
 const AC_TAG = /@(AC[A-Za-z0-9]*(?:-[A-Za-z0-9]+)*)/g
 
+// Playwright writes terminal colour codes into error messages. They are noise in a
+// markdown report and corrupt the table when pasted into a ticket.
+const ANSI = /\u001B\[[0-9;]*m/g
+
 // Playwright result statuses that mean the test did not pass.
 const FAILING = new Set(['failed', 'timedOut', 'interrupted'])
 
@@ -101,7 +105,7 @@ export function summarize(report: PwReport, declared: string[] = []): Summary {
         title: spec.title,
         file: spec.file,
         line: spec.line,
-        error: (last?.error?.message ?? '').split('\n')[0]!.slice(0, 300),
+        error: (last?.error?.message ?? '').replace(ANSI, '').split('\n')[0]!.slice(0, 300),
       })
     }
 

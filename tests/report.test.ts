@@ -121,3 +121,25 @@ test('the rendered report states NOT COVERED rather than omitting the AC', () =>
   assert.match(md, /\| AC2 \| 0 \| 0 \| NOT COVERED \|/)
   assert.match(md, /\| Passed \| 1 \| 100.0% \|/)
 })
+
+test('terminal colour codes are stripped from error messages', () => {
+  // Playwright writes ANSI into error messages; they corrupt the markdown table when the
+  // report is pasted into a ticket.
+  const esc = String.fromCharCode(27)
+  const msg = `${esc}[2mexpect(${esc}[22m${esc}[31mlocator${esc}[39m) failed`
+  const r = {
+    suites: [
+      {
+        specs: [
+          {
+            title: 'boom @AC1',
+            file: 'b.spec.ts',
+            line: 1,
+            tests: [{ results: [{ status: 'failed', error: { message: msg } }] }],
+          },
+        ],
+      },
+    ],
+  }
+  assert.equal(summarize(r, ['AC1']).failures[0]!.error, 'expect(locator) failed')
+})

@@ -50,6 +50,34 @@ becomes an output of the workflow rather than a prerequisite for it.
 Side effect worth noting: role-first locators fail when the app's accessibility is broken,
 which surfaces real defects that a `data-testid` suite would silently paper over.
 
+## Known limits of the guard
+
+These are properties of the approach, not bugs, and anyone relying on it should know them.
+
+**It is textual, not syntactic.** The analysis is regex over source, not an AST walk. It
+handles the shapes seen in real planner- and healer-generated code, but it can be walked
+around by anyone who wants to.
+
+**It only sees one file at a time.** Verified: move the expected value into an imported
+fixture —
+
+```ts
+import { EXPECTED_OPENING } from './fixtures/constants'
+expect(prefix.slice(0, EXPECTED_OPENING.length)).toBe(EXPECTED_OPENING)
+```
+
+— edit the constant in that other file, and the guard passes with exit 0. Passing every
+changed file does not help: the constant's file contains no assertion, so nothing links
+the two. Closing this needs cross-file resolution, which needs a real parser.
+
+**It cannot tell who is right.** By design. When the spec and the app disagree, the guard
+refuses the edit and escalates; it does not know whether the spec has a typo or the app
+regressed. Round 1 of the trial is the argument for that stance — the healer's diagnosis
+was confidently backwards.
+
+**It guards the diff, not the intent.** A suite can pass every gate and still test the
+wrong thing. Plan approval and PR review remain load-bearing.
+
 ## Non-goals
 
 - **Replacing QA engineers.** The pipeline produces a reviewable artifact at every stage
