@@ -75,6 +75,47 @@ the trial. `// await expect(...)` still matched every pattern, so counts and fin
 were unchanged. Source is now stripped of comments before analysis — disabling an
 assertion with `//` is exactly as destructive as deleting it.
 
+**Expected values hoisted into constants were unprotected — the worst of the three.**
+Found by pointing the guard at a real planner-shaped spec and making exactly the edit the
+healer would make. Expected values are normally hoisted into named constants (the planner
+recommends it, and it reads better):
+
+```ts
+const GENERAL_MEETING_OPENING = '…'
+expect(insertedPrefix.startsWith(GENERAL_MEETING_OPENING)).toBe(true)
+```
+
+Rewriting the constant guts the criterion while every assertion line stays byte-identical.
+The guard passed it cleanly. Identifiers referenced from a matcher argument or a
+non-locator `expect()` argument now resolve back to their declared literal, which is
+protected; constants used only to build locators stay healable.
+
+Fixing it exposed a fourth defect in the fix itself: the declaration scanner's optional
+type-annotation group matched across newlines, so `declare const process: {...}` — which
+has no initialiser — swallowed everything up to the next `=` in the file and captured the
+*following* constant's literal under the wrong name, silently removing that constant from
+protection. Two of the three holes in this guard were therefore invisible until it was
+run against real code rather than hand-written fixtures.
+
+## Does the plan actually produce a passing test?
+
+Yes, but not on the first run, and the gap between "plan looks right" and "test passes"
+was where the remaining value sat. Implementing one scenario from the plan corrected three
+things the planner got wrong or could not know:
+
+- **Organisation context is read from a different key than the obvious one.** The code
+  under test reads `localStorage.organization_id`; the plausible-looking
+  `selectedOrganization` is written at a different moment. Waiting on the wrong key
+  produces a test that passes or fails by luck. When it loses, the create request is
+  rejected with an error the app logs to the console and never surfaces — the dialog just
+  sits there, and the test times out somewhere unrelated.
+- **The plan claimed the detail panel auto-opens after creation. It does not.**
+- **Creating a record remounts the screen and re-runs the feature-flag fetch**, so the
+  list is briefly the pre-flag UI with no rows.
+
+None of these are locator problems, which is what a plan review would have looked for.
+They are readiness problems, and they are invisible until the test runs.
+
 ## Environment lessons worth keeping
 
 - **Pin the UI language explicitly.** Accessible names are the locators; if the app picks

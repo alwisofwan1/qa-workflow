@@ -110,7 +110,7 @@ broken, surfacing real defects a `data-testid` suite would paper over.
 skills/     qa-plan · qa-heal · qa-report · qa-gate
 tools/      the guards — TypeScript, compiled to dist/, no LLM, CI-runnable
 tools/lib/  pure analysis functions, unit-tested
-tests/      30 tests covering both guards
+tests/      35 tests covering both guards
 docs/       design notes and the trial writeup
 templates/  test plan + selector inventory formats
 ```
