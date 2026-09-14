@@ -1,5 +1,4 @@
 node_modules/
-dist/
 results.json
 test-results/
 playwright-report/

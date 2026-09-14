@@ -19,3 +19,16 @@ jobs:
       # can be trusted — a guard that is quietly broken is worse than no guard, because
       # the pipeline still reports green.
       - run: npm test
+
+      # dist/ is committed so the tools are runnable straight from a git install —
+      # npx neither runs `prepare` nor builds before resolving a bin, whichever
+      # protocol you use. Committing the build removes that whole class of problem,
+      # and this step removes the one it introduces: a dist/ that no longer matches
+      # the source it claims to be.
+      - name: dist/ is current
+        run: |
+          npm run build
+          git diff --exit-code -- dist || {
+            echo "::error::dist/ is stale — run 'npm run build' and commit the result"
+            exit 1
+          }
