@@ -1,5 +1,9 @@
 # qa-workflow
 
+> **This repository is archived.** Development moved to `widsley/qa-workflow`, where the
+> team can review and depend on it. Nothing is pushed here any more, so treat anything
+> below as a snapshot from 2026-09-14 rather than current.
+
 A guard layer over [Playwright Agents](https://playwright.dev/docs/test-agents).
 
 Playwright ships a planner, a generator, and a healer. They are good — better than
