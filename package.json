@@ -11,7 +11,7 @@
     "report": "node dist/tools/report.js",
     "heal-guard": "node dist/tools/heal-guard.js",
     "gate": "node dist/tools/qa-gate.js",
-    "prepack": "npm run build"
+    "prepare": "npm run build"
   },
   "engines": {
     "node": ">=18"
