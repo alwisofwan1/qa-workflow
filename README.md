@@ -53,7 +53,7 @@ test file at all. Every step was then committed automatically.
 
 None of that is a bug. It is what a pipeline with no gates produces.
 
-## The five guards
+## The six guards
 
 | # | Guard | Enforced by |
 |---|---|---|
@@ -62,6 +62,7 @@ None of that is a bug. It is what a pipeline with no gates produces.
 | 3 | Report figures are parsed from `results.json`, never authored | `tools/report.ts` |
 | 4 | AC coverage is computed; an untested AC fails the run | `tools/report.ts --require-ac` |
 | 5 | Application code may not change during a test run | `tools/qa-gate.ts` |
+| 6 | A run whose setup failed reports no evidence, not failures | `tools/report.ts` |
 
 **Guards 2 and 3 are code.** That is the whole design. A prompt saying "do not weaken
 assertions" is advice, and the failure mode here is not an agent that misunderstands the
@@ -94,7 +95,7 @@ test suite. See [docs/trial.md](docs/trial.md).
 ## Usage
 
 ```bash
-npm test                      # builds (tsc) then runs the guards' own suite, 43 tests
+npm test                      # builds (tsc) then runs the guards' own suite, 50 tests
 
 # after the healer runs, with $BASELINE = the commit before healing
 node dist/tools/heal-guard.js --base "$BASELINE" tests/**/*.spec.ts
@@ -129,7 +130,7 @@ broken, surfacing real defects a `data-testid` suite would paper over.
 skills/     qa-plan · qa-heal · qa-report · qa-gate
 tools/      the guards — TypeScript, compiled to dist/, no LLM, CI-runnable
 tools/lib/  pure analysis functions, unit-tested
-tests/      43 tests covering both guards
+tests/      50 tests covering both guards
 docs/       design notes and the trial writeup
 templates/  test plan + selector inventory formats
 ```

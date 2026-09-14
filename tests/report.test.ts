@@ -65,7 +65,8 @@ test('coverage is computed from tags on PASSING tests only', () => {
   assert.equal(acStatus(s.acSeen.get('AC1')), 'OK')
   assert.equal(acStatus(s.acSeen.get('AC2')), 'COVERED BUT FAILING')
   assert.equal(acStatus(s.acSeen.get('AC3')), 'FLAKY ONLY — NOT PROVEN')
-  assert.equal(acStatus(s.acSeen.get('AC4')), 'COVERED BUT FAILING')
+  // Skipped, so it was never measured — deliberately NOT reported as failing.
+  assert.equal(acStatus(s.acSeen.get('AC4')), 'NOT RUN')
   assert.equal(acStatus(s.acSeen.get('AC5')), 'NOT COVERED')
   assert.deepEqual(s.uncovered, ['AC5'])
   assert.deepEqual(s.unproven, ['AC2', 'AC3', 'AC4'])
@@ -142,4 +143,33 @@ test('terminal colour codes are stripped from error messages', () => {
     ],
   }
   assert.equal(summarize(r, ['AC1']).failures[0]!.error, 'expect(locator) failed')
+})
+
+test('a skipped test reports its AC as NOT RUN, not as failing', () => {
+  // Saying COVERED BUT FAILING for a test that never executed states the opposite of the
+  // truth: no evidence is not evidence of a defect.
+  const s = summarize(report([spec('a @AC1', ['skipped'])]), ['AC1'])
+  assert.equal(acStatus(s.acSeen.get('AC1')), 'NOT RUN')
+})
+
+test('a failed setup spec is surfaced as the suite not having run', () => {
+  const r = {
+    suites: [
+      {
+        specs: [
+          { title: 'authenticate', file: 'tests/auth.setup.ts', line: 1, tests: [{ results: [{ status: 'timedOut' }] }] },
+          spec('a @AC1', ['skipped']),
+          spec('b @AC2', ['skipped']),
+        ],
+      },
+    ],
+  }
+  const s = summarize(r, ['AC1', 'AC2'])
+  assert.equal(s.setupFailed, true)
+  assert.match(renderMarkdown(s), /The suite did not run/)
+})
+
+test('a normal run is not mistaken for a setup failure', () => {
+  const s = summarize(report([spec('a @AC1', ['passed']), spec('b @AC2', ['failed'])]), ['AC1', 'AC2'])
+  assert.equal(s.setupFailed, false)
 })

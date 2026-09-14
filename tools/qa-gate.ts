@@ -105,9 +105,16 @@ if (base) {
 
 // --- verdict ----------------------------------------------------------------------
 const reasons: string[] = []
+if (summary.setupFailed) {
+  reasons.push('the suite did not run — a setup spec failed and its tests were skipped')
+}
 if (summary.tally.failed > 0) reasons.push(`${summary.tally.failed} test(s) failed`)
 if (summary.uncovered.length) reasons.push(`no test covers ${summary.uncovered.join(', ')}`)
-if (summary.unproven.length) reasons.push(`unproven (failing or flaky only): ${summary.unproven.join(', ')}`)
+// When setup failed the unproven list is every AC in the suite, which is noise on top of
+// the real reason. Report it only when the run actually happened.
+if (!summary.setupFailed && summary.unproven.length) {
+  reasons.push(`unproven (failing or flaky only): ${summary.unproven.join(', ')}`)
+}
 if (tamper.length) reasons.push(`${tamper.length} spec file(s) were tampered with since ${base}`)
 if (touchedSource.length)
   reasons.push(`${touchedSource.length} application file(s) changed since ${base}`)

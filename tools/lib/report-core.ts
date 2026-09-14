@@ -33,6 +33,7 @@ export interface AcEntry {
   total: number
   passed: number
   flaky: number
+  skipped: number
 }
 
 export interface Failure {
@@ -43,6 +44,8 @@ export interface Failure {
 }
 
 export interface Summary {
+  /** A setup/dependency spec failed, so the suite never really ran. */
+  setupFailed: boolean
   tally: Record<SpecStatus, number>
   total: number
   failures: Failure[]
@@ -90,6 +93,13 @@ export function specStatus(spec: PwSpec): SpecStatus {
  */
 export function summarize(report: PwReport, declared: string[] = []): Summary {
   const specs = (report.suites ?? []).flatMap((s) => collectSpecs(s))
+
+  // A failed setup spec means every dependent test was skipped, not that the features
+  // are broken. Reporting those acceptance criteria as failing states the opposite of
+  // the truth: "no evidence" is not "evidence of a defect".
+  const setupFailed = specs.some(
+    (spec) => /\.setup\.[jt]sx?$/.test(spec.file ?? '') && specStatus(spec) === 'failed'
+  )
   const tally: Record<SpecStatus, number> = { passed: 0, failed: 0, flaky: 0, skipped: 0 }
   const failures: Failure[] = []
   const acSeen = new Map<string, AcEntry>()
@@ -112,11 +122,12 @@ export function summarize(report: PwReport, declared: string[] = []): Summary {
     // A test that claims an AC but is skipped or flaky does NOT cover it.
     for (const [, ac] of spec.title.matchAll(new RegExp(AC_TAG.source, 'g'))) {
       if (!ac) continue
-      if (!acSeen.has(ac)) acSeen.set(ac, { total: 0, passed: 0, flaky: 0 })
+      if (!acSeen.has(ac)) acSeen.set(ac, { total: 0, passed: 0, flaky: 0, skipped: 0 })
       const entry = acSeen.get(ac)!
       entry.total += 1
       if (status === 'passed') entry.passed += 1
       if (status === 'flaky') entry.flaky += 1
+      if (status === 'skipped') entry.skipped += 1
     }
   }
 
@@ -125,13 +136,16 @@ export function summarize(report: PwReport, declared: string[] = []): Summary {
   const unproven = declared.filter((ac) => acSeen.has(ac) && acSeen.get(ac)!.passed === 0)
   const stray = [...acSeen.keys()].filter((ac) => !declared.includes(ac))
 
-  return { tally, total, failures, acSeen, uncovered, unproven, stray, declared }
+  return { setupFailed, tally, total, failures, acSeen, uncovered, unproven, stray, declared }
 }
 
 export function acStatus(entry: AcEntry | undefined): string {
   if (!entry) return 'NOT COVERED'
   if (entry.passed > 0) return 'OK'
   if (entry.flaky > 0) return 'FLAKY ONLY — NOT PROVEN'
+  // A skipped test proves nothing, but it is not evidence of a defect either. Saying
+  // COVERED BUT FAILING here would report a broken feature where none was measured.
+  if (entry.skipped === entry.total) return 'NOT RUN'
   return 'COVERED BUT FAILING'
 }
 
@@ -140,7 +154,15 @@ const STATUS_KEYS: SpecStatus[] = ['passed', 'failed', 'flaky', 'skipped']
 /** Render the parts of a report a model is not allowed to write. */
 export function renderMarkdown(s: Summary): string {
   const pct = (n: number) => (s.total === 0 ? '0.0' : ((n / s.total) * 100).toFixed(1))
-  const out = ['# Test Execution Report', '', '| Metric | Count | % |', '|---|---|---|']
+  const out = ['# Test Execution Report', '']
+  if (s.setupFailed) {
+    out.push(
+      '> **The suite did not run.** A setup spec failed, so its dependent tests were',
+      '> skipped. Nothing below is evidence about the application.',
+      ''
+    )
+  }
+  out.push('| Metric | Count | % |', '|---|---|---|')
   out.push(`| Total | ${s.total} | 100% |`)
   for (const k of STATUS_KEYS) {
     out.push(`| ${k[0]!.toUpperCase()}${k.slice(1)} | ${s.tally[k]} | ${pct(s.tally[k])}% |`)
