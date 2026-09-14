@@ -14,6 +14,24 @@ npx playwright init-agents --loop=claude     ← Playwright's three agents
 
 ---
 
+## Why authored tests, not a browser-driving agent
+
+Three ways to test a UI with an agent:
+
+1. **The agent drives the browser live** — every click, page load and assertion costs
+   tokens, every time you run it.
+2. **Screenshot loops** — worse: images are token-heavy and the loop is serial.
+3. **The agent writes tests; Playwright runs them** — you pay once for authoring, and
+   execution is free forever after.
+
+This repo assumes the third. The tests persist, accumulate into a regression suite, and
+run in parallel on Playwright's own workers. You buy the agent's judgement for test
+*design* and pay nothing for execution — which is what makes a per-release happy-path
+suite affordable at all.
+
+It also creates the problem below. Tests that persist are tests an agent can quietly
+edit later.
+
 ## The problem
 
 An agentic QA pipeline has a structural conflict of interest: the same actor writes the
@@ -35,7 +53,7 @@ test file at all. Every step was then committed automatically.
 
 None of that is a bug. It is what a pipeline with no gates produces.
 
-## The four guards
+## The five guards
 
 | # | Guard | Enforced by |
 |---|---|---|
@@ -43,6 +61,7 @@ None of that is a bug. It is what a pipeline with no gates produces.
 | 2 | Healer may not change asserted values, skip, or delete tests | `tools/heal-guard.ts` |
 | 3 | Report figures are parsed from `results.json`, never authored | `tools/report.ts` |
 | 4 | AC coverage is computed; an untested AC fails the run | `tools/report.ts --require-ac` |
+| 5 | Application code may not change during a test run | `tools/qa-gate.ts` |
 
 **Guards 2 and 3 are code.** That is the whole design. A prompt saying "do not weaken
 assertions" is advice, and the failure mode here is not an agent that misunderstands the

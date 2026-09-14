@@ -34,6 +34,25 @@ A plan from `playwright-test-planner` plus the ticket's acceptance criteria.
 7. **Shared state is identified.** Anything org-wide or environment-wide needs serial
    execution and a teardown that restores the original value — read live, never hardcoded.
 
+## Suite shape
+
+Organise specs by what they prove, not by page:
+
+```
+tests/e2e/
+  happy-path.spec.ts    core journeys that must work every release
+  validation.spec.ts    required fields, error states, rejected input
+  edge-cases.spec.ts    empty, boundary, special characters
+```
+
+For a release gate, `happy-path.spec.ts` is the one that must never be allowed to rot.
+It is also the one to write first — the others are worth less if the core journey is
+unproven.
+
+**Keep it small.** Ten to fifteen tests that each prove something a user cares about
+beat a hundred that assert trivia. Every test is a thing that must keep passing forever;
+a suite nobody trusts to be meaningful is a suite people start skipping.
+
 ## Stop condition
 
 Print the verdict and **wait**. Generation does not begin until a human approves. This

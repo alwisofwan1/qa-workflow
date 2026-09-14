@@ -6,7 +6,8 @@
  * green is worth believing. Two independent questions, either of which blocks:
  *
  *   1. Did anything tamper with the tests since the baseline? (heal-guard)
- *   2. Do the results and the acceptance-criteria coverage hold up? (report)
+ *   2. Was application code changed during the test run?
+ *   3. Do the results and the acceptance-criteria coverage hold up? (report)
  *
  * A gate that is noisy gets ignored, and a gate that is lenient is decoration. This one
  * treats a flaky pass as unproven rather than as a pass, on purpose.
@@ -21,6 +22,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 
 import { analyze } from './lib/heal-guard-core.js'
+import { isTestFile } from './lib/paths.js'
 import { summarize, renderMarkdown, type PwReport } from './lib/report-core.js'
 
 const argv = process.argv.slice(2)
@@ -57,6 +59,8 @@ const summary = summarize(report, declared)
 // --- tamper check (only when a baseline is given) ---------------------------------
 const base = opt('base')
 const tamper: { path: string; problems: string[] }[] = []
+let touchedSource: string[] = []
+
 
 if (base) {
   let specs = list('specs')
@@ -73,6 +77,20 @@ if (base) {
       process.exit(3)
     }
   }
+  // Guard against the worst possible "fix": editing the application until the tests
+  // agree with it. A published Playwright-testing skill instructs exactly that —
+  // "App bug -> fix the application code" — inside an automated fix loop. Changing the
+  // product to make its own tests pass is not healing, and it is not the runner's call.
+  try {
+    touchedSource = execFileSync('git', ['diff', '--name-only', base], { encoding: 'utf8' })
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .filter((p) => !isTestFile(p))
+  } catch {
+    touchedSource = []
+  }
+
   for (const path of specs) {
     let before: string
     try {
@@ -91,6 +109,8 @@ if (summary.tally.failed > 0) reasons.push(`${summary.tally.failed} test(s) fail
 if (summary.uncovered.length) reasons.push(`no test covers ${summary.uncovered.join(', ')}`)
 if (summary.unproven.length) reasons.push(`unproven (failing or flaky only): ${summary.unproven.join(', ')}`)
 if (tamper.length) reasons.push(`${tamper.length} spec file(s) were tampered with since ${base}`)
+if (touchedSource.length)
+  reasons.push(`${touchedSource.length} application file(s) changed since ${base}`)
 
 const blocked = reasons.length > 0
 
@@ -113,11 +133,27 @@ if (tamper.length) {
   }
   lines.push('', 'A failing assertion is a finding, not a thing to edit. A human decides.')
 }
+if (touchedSource.length) {
+  lines.push('', '## Application code changed during the run', '')
+  for (const p of touchedSource) lines.push(`- \`${p}\``)
+  lines.push(
+    '',
+    'These are not test files. A test run that also edits the product is not evidence —',
+    'the thing under test changed while it was being measured.'
+  )
+}
 lines.push('', renderMarkdown(summary))
 
 const output = flag('json')
   ? JSON.stringify(
-      { blocked, reasons, tamper, ...summary, acSeen: Object.fromEntries(summary.acSeen) },
+      {
+        blocked,
+        reasons,
+        tamper,
+        touchedSource,
+        ...summary,
+        acSeen: Object.fromEntries(summary.acSeen),
+      },
       null,
       2
     )

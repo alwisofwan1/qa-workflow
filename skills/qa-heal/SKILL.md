@@ -33,6 +33,35 @@ node dist/tools/heal-guard.js --base "$BASELINE" $(git diff --name-only "$BASELI
    Do not re-run the healer on the same failure with different wording. The guard's
    verdict is not a puzzle to route around.
 
+## Bounded, not endless
+
+**Three attempts, then stop.** After the third failed fix, report what is still failing,
+what was tried, and ask for direction. An agent that keeps iterating on a test it cannot
+fix eventually reaches for `test.fixme()` — not because that is the right answer, but
+because it is the only remaining way to end the loop.
+
+**Never edit application code.** Not once, not "just a small fix so the test passes". A
+test run that also changes the product is not evidence: the thing under test moved while
+it was being measured. If the application is genuinely wrong, that is a finding and a
+separate change with its own review. `qa-gate` blocks any run where non-test files
+changed since the baseline, so this is enforced rather than requested.
+
+This warning is specific. A published Playwright-testing skill instructs its fix loop to
+do exactly this — *"App bug → fix the application code"* — inside an automated loop with
+no gate. Read that as the default an agent will drift toward unless stopped.
+
+## Every failure gets a label
+
+Before fixing anything, classify the failure in the report as one of:
+
+| Label | Meaning | Action |
+|---|---|---|
+| **test bug** | wrong locator, wrong wait, bad setup | heal it |
+| **app bug** | the application behaves wrongly | finding — do not touch the app |
+| **spec bug** | the expected value is stale or wrong | finding — a human decides |
+
+An unlabelled failure is an unfinished diagnosis. "It passes now" is not a label.
+
 ## The distinction that matters
 
 A test fails for one of two reasons:
