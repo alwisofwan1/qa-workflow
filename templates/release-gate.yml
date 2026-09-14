@@ -1,11 +1,30 @@
 # Reusable release gate — drop into the APP repo as .github/workflows/release-gate.yml
 #
 # Runs the happy-path suite before a release and decides whether its green is worth
-# believing. Blocks on: any failure, any acceptance criterion without a passing test, and
+# believing. Reports on: any failure, any acceptance criterion without a passing test, and
 # any tampering with the specs since the baseline.
 #
 # Set DECLARED_ACS to the acceptance criteria the suite is supposed to prove. Leaving it
 # empty disables the coverage gate, which defeats half the point.
+#
+# ─── Manual only, on purpose ─────────────────────────────────────────────────────────
+# This starts as a button somebody presses, and nothing else. Not because the automation
+# is unreliable, but because a gate that appears uninvited before anyone trusts it gets
+# read as noise — and once a team is in the habit of ignoring a red mark, that habit is
+# very hard to reverse. Let people call it because it is useful first.
+#
+# When the team is reading its verdict and acting on it, add the release PR trigger:
+#
+#   on:
+#     workflow_dispatch: ...
+#     pull_request:
+#       branches: [main]        # only the weekly develop -> main release PR,
+#                               # never day-to-day feature PRs, which target develop
+#
+# Making it a *required* status check is a third, separate step — and may never be
+# needed. A verdict that is read and believed already does the job without the power to
+# block anything.
+# ─────────────────────────────────────────────────────────────────────────────────────
 
 name: release-gate
 
@@ -16,8 +35,6 @@ on:
         description: 'Commit the specs were reviewed at (tamper check). Leave empty to skip.'
         required: false
         default: ''
-  pull_request:
-    branches: [main]
 
 env:
   DECLARED_ACS: '' # e.g. AC1,AC2,AC3
